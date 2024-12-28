@@ -1,10 +1,13 @@
 package main
 
 import (
-	"encoding/base64"
+	
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -46,13 +49,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Content type is empty", nil)
 		return
 	}
-	// fmt.Println("the media type is ",mediaType)
 
-	fileData, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "unable to get media info", err)
-		return
-	}
 	vidData, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "unable to get video data", err)
@@ -62,18 +59,30 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "User not authorized to update this media data", nil)
 		return
 	}
+	
 
-	encodedVideo := base64.StdEncoding.EncodeToString(fileData)
-	dataUrl := fmt.Sprintf("data:%s;base64,%s", mediaType, encodedVideo)
+	fileType := strings.Split(mediaType,"/")
+	filePath := filepath.Join(cfg.assetsRoot,fmt.Sprintf("%v.%s",videoID,fileType[1]))
+	outfile, err := os.Create(filePath)
+	if err != nil {
+		respondWithError(w,http.StatusBadRequest,"Error creating the file",err)
+		return 
+	}
+	defer outfile.Close()
+	
+	
+	_, err = io.Copy(outfile,file)
+	if err != nil {
+		respondWithError(w,http.StatusBadRequest,"Error copying data to the file",err)
+		return 
+	}
+	fileUrl := fmt.Sprintf("http://localhost:%s/%s",cfg.port,filePath)
 
-	// url := fmt.Sprintf("localhost:%s/api/thumbnails/%v", cfg.port, videoID)
-	vidData.ThumbnailURL = &dataUrl
+	vidData.ThumbnailURL = &fileUrl
 
-	// newThumbnail := thumbnail{data: fileData, mediaType: mediaType}
-	// videoThumbnails[videoID] = newThumbnail
 	err = cfg.db.UpdateVideo(vidData)
 	if err != nil {
-		// delete(videoThumbnails, videoID)
+		
 		respondWithError(w, http.StatusBadRequest, "unable to update video information", err)
 		return
 	}
