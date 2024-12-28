@@ -55,7 +55,6 @@ cp .env.example .env
 You'll need to update values in the `.env` file to match your configuration, but _you won't need to do anything here until the course tells you to_.
 
 ## 3. Run the server
-
 ```bash
 go run .
 ```
