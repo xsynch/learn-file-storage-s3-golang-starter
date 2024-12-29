@@ -1,9 +1,9 @@
 package main
 
 import (
-	
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,11 +44,25 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	defer file.Close()
-	mediaType := header.Header.Get("Content-Type")
+	// mediaType := header.Header.Get("Content-Type")
+	// if mediaType == "" {
+	// 	respondWithError(w, http.StatusBadRequest, "Content type is empty", nil)
+	// 	return
+	// }
+	mediaType,_,err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+	if err != nil {
+		respondWithError(w,http.StatusBadRequest,"Error Parsing Media Type",err)
+		return 
+	}
 	if mediaType == "" {
 		respondWithError(w, http.StatusBadRequest, "Content type is empty", nil)
 		return
 	}
+	if (mediaType != "image/jpeg" && mediaType != "image/png"){
+		respondWithError(w,http.StatusBadRequest,"Only Images Allowed",nil)
+		return 
+	}
+
 
 	vidData, err := cfg.db.GetVideo(videoID)
 	if err != nil {
