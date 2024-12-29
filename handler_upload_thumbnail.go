@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -15,6 +17,16 @@ import (
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
+
+	c := 32
+	b := make([]byte, c)
+	_, err := rand.Read(b)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fileName := base64.RawURLEncoding.EncodeToString(b)
+
 	videoID, err := uuid.Parse(videoIDString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
@@ -44,25 +56,20 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	defer file.Close()
-	// mediaType := header.Header.Get("Content-Type")
-	// if mediaType == "" {
-	// 	respondWithError(w, http.StatusBadRequest, "Content type is empty", nil)
-	// 	return
-	// }
-	mediaType,_,err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+
+	mediaType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
 	if err != nil {
-		respondWithError(w,http.StatusBadRequest,"Error Parsing Media Type",err)
-		return 
+		respondWithError(w, http.StatusBadRequest, "Error Parsing Media Type", err)
+		return
 	}
 	if mediaType == "" {
 		respondWithError(w, http.StatusBadRequest, "Content type is empty", nil)
 		return
 	}
-	if (mediaType != "image/jpeg" && mediaType != "image/png"){
-		respondWithError(w,http.StatusBadRequest,"Only Images Allowed",nil)
-		return 
+	if mediaType != "image/jpeg" && mediaType != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "Only Images Allowed", nil)
+		return
 	}
-
 
 	vidData, err := cfg.db.GetVideo(videoID)
 	if err != nil {
@@ -73,30 +80,28 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "User not authorized to update this media data", nil)
 		return
 	}
-	
 
-	fileType := strings.Split(mediaType,"/")
-	filePath := filepath.Join(cfg.assetsRoot,fmt.Sprintf("%v.%s",videoID,fileType[1]))
+	fileType := strings.Split(mediaType, "/")
+	filePath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", fileName, fileType[1]))
 	outfile, err := os.Create(filePath)
 	if err != nil {
-		respondWithError(w,http.StatusBadRequest,"Error creating the file",err)
-		return 
+		respondWithError(w, http.StatusBadRequest, "Error creating the file", err)
+		return
 	}
 	defer outfile.Close()
-	
-	
-	_, err = io.Copy(outfile,file)
+
+	_, err = io.Copy(outfile, file)
 	if err != nil {
-		respondWithError(w,http.StatusBadRequest,"Error copying data to the file",err)
-		return 
+		respondWithError(w, http.StatusBadRequest, "Error copying data to the file", err)
+		return
 	}
-	fileUrl := fmt.Sprintf("http://localhost:%s/%s",cfg.port,filePath)
+	fileUrl := fmt.Sprintf("http://localhost:%s/%s", cfg.port, filePath)
 
 	vidData.ThumbnailURL = &fileUrl
 
 	err = cfg.db.UpdateVideo(vidData)
 	if err != nil {
-		
+
 		respondWithError(w, http.StatusBadRequest, "unable to update video information", err)
 		return
 	}
