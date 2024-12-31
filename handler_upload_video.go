@@ -87,6 +87,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w,http.StatusBadRequest,"Error Resetting to the start of the file",err)
 		return 
 	}
+	aspectRatio,err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w,http.StatusBadRequest,"Error getting Aspect Ratio",err)
+		return 
+	}
 
 	c := 32
 	b := make([]byte, c)
@@ -96,7 +101,16 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	fileName := base64.RawURLEncoding.EncodeToString(b)
-	fullName := fmt.Sprintf("%s.mp4",fileName)
+	var prefix string
+	if aspectRatio == "16:9"{
+		prefix = "landscape"
+	} else if aspectRatio == "9:16"{
+		prefix = "portrait"
+	} else {
+		prefix = "other"
+	}
+
+	fullName := fmt.Sprintf("%s/%s.mp4",prefix,fileName)
 	
 	
 	_,err = cfg.s3client.PutObject(r.Context(),&s3.PutObjectInput{
