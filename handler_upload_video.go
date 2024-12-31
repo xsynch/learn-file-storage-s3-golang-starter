@@ -87,7 +87,21 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w,http.StatusBadRequest,"Error Resetting to the start of the file",err)
 		return 
 	}
-	aspectRatio,err := getVideoAspectRatio(tempFile.Name())
+	processedFilePath,err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w,http.StatusBadRequest,"",err)
+		return 
+	}
+	processedFile,err  := os.Open(processedFilePath)
+	if err != nil {
+		respondWithError(w,http.StatusBadRequest,"Error opening processed file",err)
+		return 
+	}
+	defer processedFile.Close()
+	defer os.Remove(processedFile.Name())
+	
+	// aspectRatio,err := getVideoAspectRatio(tempFile.Name())
+	aspectRatio,err := getVideoAspectRatio(processedFile.Name())
 	if err != nil {
 		respondWithError(w,http.StatusBadRequest,"Error getting Aspect Ratio",err)
 		return 
@@ -116,7 +130,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	_,err = cfg.s3client.PutObject(r.Context(),&s3.PutObjectInput{
 		Bucket: aws.String(cfg.s3Bucket),
 		Key: aws.String(fullName),
-		Body: tempFile,
+		Body: processedFile,
 		ContentType: aws.String(mediaType),
 		
 	})
