@@ -2,13 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	
-)
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+)
 
 type VideoMetadata struct {
 	Streams []struct {
@@ -22,15 +24,10 @@ type VideoMetadata struct {
 		Width              int    `json:"width,omitempty"`
 		Height             int    `json:"height,omitempty"`
 		CodedWidth         int    `json:"coded_width,omitempty"`
-		CodedHeight        int    `json:"coded_height,omitempty"`	
-		DisplayAspectRatio string `json:"display_aspet_ratio"`	
+		CodedHeight        int    `json:"coded_height,omitempty"`
+		DisplayAspectRatio string `json:"display_aspet_ratio"`
 	} `json:"streams"`
 }
-
-
-
-
-
 
 func (cfg apiConfig) ensureAssetsDir() error {
 	if _, err := os.Stat(cfg.assetsRoot); os.IsNotExist(err) {
@@ -39,64 +36,68 @@ func (cfg apiConfig) ensureAssetsDir() error {
 	return nil
 }
 
-
 func getVideoAspectRatio(filePath string) (string, error) {
-	cmd := exec.Command("ffprobe","-v", "error","-print_format", "json","-show_streams",filePath)
+	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
 	out := bytes.Buffer{}
-	cmd.Stdout = &out 
+	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		return "",err 
+		return "", err
 	}
 	videoMetadata := VideoMetadata{}
 
-	err = json.Unmarshal(out.Bytes(),&videoMetadata)
+	err = json.Unmarshal(out.Bytes(), &videoMetadata)
 	if err != nil {
-		return "",err 
+		return "", err
 	}
 
+	for _, val := range videoMetadata.Streams {
 
-	
-	for _,val := range videoMetadata.Streams{
-		
-		
-
-		
 		if val.Width > val.Height {
-			aspectRatio := fmt.Sprintf("%.2f",float32(val.Width)/float32(val.Height))
+			aspectRatio := fmt.Sprintf("%.2f", float32(val.Width)/float32(val.Height))
 			// fmt.Printf("Aspect Ratio Larger Width: %s\n",aspectRatio)
-			if aspectRatio == "1.78"{
-				return "16:9",nil 
+			if aspectRatio == "1.78" {
+				return "16:9", nil
 			} else {
-				return "other",nil 
+				return "other", nil
 			}
 		}
 
 		if val.Width < val.Height {
-			aspectRatio := fmt.Sprintf("%.2f",float32(val.Height)/float32(val.Width))
+			aspectRatio := fmt.Sprintf("%.2f", float32(val.Height)/float32(val.Width))
 			// fmt.Printf("Aspect Ratio Larger Height: %s\n",aspectRatio)
-			if aspectRatio == "1.78"{
-				return "9:16",nil 
+			if aspectRatio == "1.78" {
+				return "9:16", nil
 			} else {
-				return "other",nil 
+				return "other", nil
 			}
 		}
 
 	}
 
-	return "",fmt.Errorf("unable to get aspect ratio")
-
-
+	return "", fmt.Errorf("unable to get aspect ratio")
 
 }
 
 func processVideoForFastStart(filePath string) (string, error) {
-	newPath := fmt.Sprintf("%s.processing",filePath)
-	cmd := exec.Command("ffmpeg","-i",filePath,"-c","copy","-movflags","faststart","-f","mp4",newPath)
+	newPath := fmt.Sprintf("%s.processing", filePath)
+	cmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", newPath)
 	err := cmd.Run()
 	if err != nil {
-		return "",err 
+		return "", err
 	}
 
-	return newPath,nil 
+	return newPath, nil
+}
+
+func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
+	s3PresignedClient := s3.NewPresignClient(s3Client)
+
+	s3presignedreq, err := s3PresignedClient.PresignGetObject(context.TODO(), &s3.GetObjectInput{Bucket: &bucket, Key: &key}, s3.WithPresignExpires(expireTime))
+	if err != nil {
+		return "", err
+	}
+	// fmt.Printf(s3presignedreq.URL)
+	return s3presignedreq.URL, nil
+
 }
