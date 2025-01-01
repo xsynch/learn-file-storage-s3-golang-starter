@@ -2,14 +2,10 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type VideoMetadata struct {
@@ -90,14 +86,14 @@ func processVideoForFastStart(filePath string) (string, error) {
 	return newPath, nil
 }
 
-func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-	s3PresignedClient := s3.NewPresignClient(s3Client)
+// func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
+// 	s3PresignedClient := s3.NewPresignClient(s3Client)
 
-	s3presignedreq, err := s3PresignedClient.PresignGetObject(context.TODO(), &s3.GetObjectInput{Bucket: &bucket, Key: &key}, s3.WithPresignExpires(expireTime))
-	if err != nil {
-		return "", err
-	}
-	// fmt.Printf(s3presignedreq.URL)
-	return s3presignedreq.URL, nil
+// 	s3presignedreq, err := s3PresignedClient.PresignGetObject(context.TODO(), &s3.GetObjectInput{Bucket: &bucket, Key: &key}, s3.WithPresignExpires(expireTime))
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	// fmt.Printf(s3presignedreq.URL)
+// 	return s3presignedreq.URL, nil
 
-}
+// }

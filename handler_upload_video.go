@@ -8,13 +8,12 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"strings"
-	"time"
+
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
+	
 	"github.com/google/uuid"
 )
 
@@ -145,8 +144,8 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusBadRequest, "Error uploading object", err)
 		return
 	}
-	// newVidURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s",cfg.s3Bucket,cfg.s3Region,fullName)
-	newVidURL := fmt.Sprintf("%s,%s", cfg.s3Bucket, fullName)
+	newVidURL := fmt.Sprintf("%s/%s",cfg.s3CfDistribution,fullName)
+	// newVidURL := fmt.Sprintf("%s,%s", cfg.s3Bucket, fullName)
 
 	video.VideoURL = &newVidURL
 	err = cfg.db.UpdateVideo(video)
@@ -155,26 +154,26 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	video, err = cfg.dbVideoToSignedVideo(video)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error getting signed video", err)
-		return
-	}
+	// video, err = cfg.dbVideoToSignedVideo(video)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "Error getting signed video", err)
+	// 	return
+	// }
 
 	respondWithJSON(w, http.StatusOK, video)
 
 }
 
-func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	if video.VideoURL == nil {
-		return video, nil
-	}
-	val := strings.Split(*video.VideoURL, ",")
-	url, err := generatePresignedURL(cfg.s3client, val[0], val[1], 5*time.Minute)
-	if err != nil {
-		return video, err
-	}
-	video.VideoURL = &url
+// func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
+// 	if video.VideoURL == nil {
+// 		return video, nil
+// 	}
+// 	val := strings.Split(*video.VideoURL, ",")
+// 	url, err := generatePresignedURL(cfg.s3client, val[0], val[1], 5*time.Minute)
+// 	if err != nil {
+// 		return video, err
+// 	}
+// 	video.VideoURL = &url
 
-	return video, nil
-}
+// 	return video, nil
+// }
